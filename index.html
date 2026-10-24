@@ -1,0 +1,2251 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>신들의 전쟁 (War of Gods)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+        
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+
+        body {
+            background-color: #030305;
+            color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 1080px;
+            aspect-ratio: 16 / 9;
+            background: #090a0f;
+            box-shadow: 0 0 60px rgba(234, 179, 8, 0.2), 0 0 30px rgba(0, 0, 0, 0.9);
+            border: 2px solid #1e293b;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        .overlay-screen {
+            position: absolute;
+            inset: 0;
+            background: rgba(8, 9, 14, 0.95);
+            backdrop-filter: blur(8px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            padding: 2rem;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(234, 179, 8, 0.4);
+            border-radius: 3px;
+        }
+
+        .glow-gold {
+            text-shadow: 0 0 15px rgba(251, 191, 36, 0.6);
+        }
+
+        .glow-red {
+            text-shadow: 0 0 15px rgba(239, 68, 68, 0.8);
+        }
+
+        .god-card-selected {
+            border-color: #f59e0b !important;
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
+            transform: translateY(-4px);
+        }
+
+        .key-badge {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            color: #f3f4f6;
+            display: inline-block;
+            margin: 0 2px;
+        }
+
+        /* Touch Controls for Mobile/Tablet */
+        #touch-controls {
+            display: none;
+        }
+
+        @media (pointer: coarse), (max-width: 1024px) {
+            #touch-controls {
+                display: flex;
+            }
+            #controls-bar {
+                display: none;
+            }
+        }
+
+        .touch-btn {
+            background: rgba(30, 41, 59, 0.85);
+            border: 1.5px solid rgba(245, 158, 11, 0.5);
+            color: #f3f4f6;
+            font-weight: bold;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            transition: background-color 0.1s, transform 0.05s;
+        }
+
+        .touch-btn:active {
+            background: rgba(245, 158, 11, 0.4);
+            transform: scale(0.92);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <!-- Main Canvas -->
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- Controls Bar (PC / Desktop Legend) -->
+        <div id="controls-bar" class="absolute bottom-1 left-0 right-0 text-center text-[11px] text-gray-400 z-10 pointer-events-none">
+            <span class="key-badge">▲</span><span class="key-badge">▼</span><span class="key-badge">◀</span><span class="key-badge">▶</span> 이동 / 커서 &nbsp;|&nbsp; 
+            <span class="key-badge">Space</span> 기술 사용 / 선택 &nbsp;|&nbsp; 
+            <span class="key-badge">Shift</span> 교체 / 동료 조율 &nbsp;|&nbsp;
+            <span class="key-badge">ESC</span> 일시정지 / 설정
+        </div>
+
+        <!-- Touch Controls (Mobile / Tablet Overlay) -->
+        <div id="touch-controls" class="absolute bottom-2 left-2 right-2 z-20 flex justify-between items-center pointer-events-auto px-1">
+            <!-- Directional D-Pad -->
+            <div class="grid grid-cols-3 gap-1 w-28 h-28">
+                <div></div>
+                <button class="touch-btn h-9 text-xs" data-key="ArrowUp">▲</button>
+                <div></div>
+                <button class="touch-btn h-9 text-xs" data-key="ArrowLeft">◀</button>
+                <button class="touch-btn h-9 text-xs" data-key="ArrowDown">▼</button>
+                <button class="touch-btn h-9 text-xs" data-key="ArrowRight">▶</button>
+                <div></div>
+                <div></div>
+                <div></div>
+            </div>
+
+            <!-- Action Buttons Pad -->
+            <div class="flex gap-1.5 items-center">
+                <button class="touch-btn h-10 px-3 text-[11px] bg-slate-800/90 text-amber-300 border-amber-500/40" data-key="Shift">교체</button>
+                <button class="touch-btn h-10 px-3 text-[11px] bg-slate-800/90 text-gray-300 border-slate-600" data-key="Escape">설정</button>
+                <button class="touch-btn h-12 px-5 text-xs bg-amber-500/20 text-amber-300 border-amber-400 font-black" data-key="Space">선택/공격</button>
+            </div>
+        </div>
+
+        <!-- 1. Title Screen -->
+        <div id="start-screen" class="overlay-screen">
+            <h1 class="text-5xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-500 to-red-500 mb-2 glow-gold">
+                신들의 전쟁
+            </h1>
+            <p class="text-amber-400/80 mb-6 text-xs tracking-wider uppercase font-bold">WAR OF GODS : MYTHOLOGY EXPEDITION</p>
+
+            <div class="bg-slate-900/90 p-5 rounded-2xl border border-amber-500/30 max-w-lg mb-6 text-center text-gray-300 text-xs leading-relaxed space-y-2.5">
+                <p>⚡ <span class="text-amber-400 font-bold">속성 상성 & 신성 권능</span>: 8가지 신성 속성과 각 신의 전용 스킬 4종을 활용하세요!</p>
+                <p>👑 <span class="text-yellow-300 font-bold">신성 등급 시스템</span>: C / B / A / S 등급별 능력치와 희귀도가 다릅니다!</p>
+                <p>🍇 <span class="text-purple-400 font-bold">신화의 계약 (영입)</span>: 승리 후 강림한 상대를 팀으로 포섭하여 최강 신단을 구성하세요!</p>
+            </div>
+
+            <button id="btn-start" class="px-10 py-3.5 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-black text-lg rounded-xl shadow-xl hover:brightness-110 active:scale-95 transition cursor-pointer border-2 border-yellow-200">
+                전쟁 참여 (Space)
+            </button>
+        </div>
+
+        <!-- 2. Starter God Select Screen -->
+        <div id="select-screen" class="overlay-screen hidden">
+            <h2 class="text-2xl font-bold text-amber-400 mb-1 glow-gold">스타팅 주신 선택</h2>
+            <p class="text-gray-400 text-xs mb-4">여정을 이끌 강력한 주신(S급 제우스, S급 포세이돈, A급 하데스) 중 한 분을 선택하세요.</p>
+
+            <div id="god-select-list" class="grid grid-cols-3 gap-4 w-full max-w-3xl mb-4 p-2">
+                <!-- Populated dynamically -->
+            </div>
+
+            <div class="text-amber-300 text-xs font-semibold animate-pulse">
+                [◀/▶] 이동 | [Space] 신 선택
+            </div>
+        </div>
+
+        <!-- 3. Pause / Settings Modal -->
+        <div id="settings-screen" class="overlay-screen hidden z-30">
+            <div class="bg-slate-900 border-2 border-amber-500/50 rounded-2xl p-6 w-96 shadow-2xl">
+                <h2 class="text-2xl font-bold text-amber-400 mb-6 text-center border-b border-slate-800 pb-2">게임 설정</h2>
+                
+                <div class="space-y-6 text-sm">
+                    <div>
+                        <div class="flex justify-between mb-2">
+                            <span class="text-gray-300">음향 효과 크기</span>
+                            <span id="setting-vol-text" class="text-amber-400 font-bold">100%</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button id="vol-down" class="px-3 py-1 bg-slate-800 rounded text-amber-400 hover:bg-slate-700">-</button>
+                            <div class="flex-1 bg-slate-800 h-3 rounded-full overflow-hidden">
+                                <div id="vol-bar" class="bg-amber-400 h-full w-full"></div>
+                            </div>
+                            <button id="vol-up" class="px-3 py-1 bg-slate-800 rounded text-amber-400 hover:bg-slate-700">+</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between mb-2">
+                            <span class="text-gray-300">전투 진행 속도</span>
+                            <span id="setting-speed-text" class="text-amber-400 font-bold">1.0x</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 text-center">
+                            <button id="speed-1" class="py-2 bg-amber-500 text-black font-bold rounded">1.0x</button>
+                            <button id="speed-2" class="py-2 bg-slate-800 text-gray-300 rounded hover:bg-slate-700">1.5x</button>
+                            <button id="speed-3" class="py-2 bg-slate-800 text-gray-300 rounded hover:bg-slate-700">2.0x</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8 pt-4 border-t border-slate-800 flex justify-center">
+                    <button id="btn-close-settings" class="px-6 py-2 bg-amber-500 text-black font-bold rounded-lg hover:bg-amber-400">
+                        닫기 (ESC / Space)
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. Game Over / Game Victory Screen -->
+        <div id="end-screen" class="overlay-screen hidden">
+            <h1 id="end-title" class="text-5xl font-black mb-3">GAME OVER</h1>
+            <p id="end-subtitle" class="text-gray-300 mb-6 text-sm">신들의 원정이 종말을 맞이했습니다.</p>
+            
+            <div id="end-stats" class="bg-slate-900/90 border border-slate-800 rounded-xl p-4 w-80 text-xs mb-6 space-y-2">
+                <!-- injected stats -->
+            </div>
+
+            <button id="btn-restart" class="px-8 py-3 bg-amber-500 text-black font-bold text-lg rounded-xl hover:bg-amber-400 shadow-lg cursor-pointer">
+                다시 도전하기 (Space)
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * TYPE ADVANTAGE CHART
+         */
+        const TYPES = {
+            Electric: { name: '전기', color: '#facc15', bg: '#854d0e' },
+            Water:    { name: '물',   color: '#38bdf8', bg: '#075985' },
+            Fire:     { name: '불',   color: '#f87171', bg: '#991b1b' },
+            Grass:    { name: '풀',   color: '#4ade80', bg: '#166534' },
+            Flying:   { name: '비행', color: '#a7f3d0', bg: '#065f46' },
+            Ground:   { name: '지면', color: '#d97706', bg: '#78350f' },
+            Dark:     { name: '악',   color: '#c084fc', bg: '#581c87' },
+            Dragon:   { name: '드래곤', color: '#fb7185', bg: '#9f1239' }
+        };
+
+        const TIERS = {
+            S: { name: 'S등급 (주신)', color: '#fbbf24', bg: '#78350f' },
+            A: { name: 'A등급 (상위신)', color: '#a855f7', bg: '#581c87' },
+            B: { name: 'B등급 (일반신)', color: '#3b82f6', bg: '#1e3a8a' },
+            C: { name: 'C등급 (하위신)', color: '#9ca3af', bg: '#374151' }
+        };
+
+        const TYPE_CHART = {
+            Electric: { Water: 2.0, Flying: 2.0, Electric: 0.5, Grass: 0.5, Dragon: 0.5, Ground: 0.0 },
+            Water:    { Fire: 2.0, Ground: 2.0, Water: 0.5, Grass: 0.5, Dragon: 0.5 },
+            Fire:     { Grass: 2.0, Fire: 0.5, Water: 0.5, Dragon: 0.5 },
+            Grass:    { Water: 2.0, Ground: 2.0, Fire: 0.5, Grass: 0.5, Flying: 0.5, Dragon: 0.5 },
+            Flying:   { Grass: 2.0, Electric: 0.5, Ground: 1.0 },
+            Ground:   { Electric: 2.0, Fire: 2.0, Grass: 0.5, Flying: 0.0 },
+            Dark:     { Dragon: 2.0, Dark: 0.5 },
+            Dragon:   { Dragon: 2.0, Electric: 0.5, Water: 0.5, Fire: 0.5, Grass: 0.5 }
+        };
+
+        function getTypeMultiplier(attackType, defenderType) {
+            if (!TYPE_CHART[attackType] || TYPE_CHART[attackType][defenderType] === undefined) {
+                return 1.0;
+            }
+            return TYPE_CHART[attackType][defenderType];
+        }
+
+        /**
+         * GOD DATABASE
+         */
+        const GOD_DATABASE = [
+            {
+                id: 'hermes',
+                name: '헤르메스',
+                tier: 'C',
+                title: '전령의 신',
+                type: 'Flying',
+                hp: 95,
+                atk: 28,
+                def: 7,
+                spd: 22,
+                relicName: '전령의 날개 신발',
+                pixelArtKey: 'hermes',
+                skills: [
+                    { name: '신속의 바람', type: 'Flying', power: 30, maxPp: 20, pp: 20, desc: '재빠르게 바람 칼날을 날립니다.' },
+                    { name: '전령 기습', type: 'Flying', power: 55, maxPp: 12, pp: 12, desc: '고속으로 기습 돌진합니다.' },
+                    { name: '바람 가르기', type: 'Flying', power: 65, maxPp: 8, pp: 8, desc: '바람 충격파를 발사합니다.' },
+                    { name: '행운의 회피', type: 'Flying', power: 0, healRatio: 0.25, maxPp: 5, pp: 5, desc: '체력을 25% 회복합니다.' }
+                ]
+            },
+            {
+                id: 'dionysus',
+                name: '디오니소스',
+                tier: 'C',
+                title: '풍요와 술의 신',
+                type: 'Grass',
+                hp: 110,
+                atk: 26,
+                def: 9,
+                spd: 12,
+                relicName: '디오니소스의 술잔',
+                pixelArtKey: 'dionysus',
+                skills: [
+                    { name: '포도덩굴 휩쓸기', type: 'Grass', power: 32, maxPp: 20, pp: 20, desc: '포도덩굴로 적을 휘감습니다.' },
+                    { name: '취기 폭발', type: 'Grass', power: 58, maxPp: 10, pp: 10, desc: '취기를 방출하여 공격합니다.' },
+                    { name: '신성한 포도주', type: 'Grass', power: 0, healRatio: 0.3, maxPp: 6, pp: 6, desc: '체력을 30% 회복합니다.' },
+                    { name: '광란의 축제', type: 'Grass', power: 72, maxPp: 5, pp: 5, desc: '축제의 강타로 피해를 줍니다.' }
+                ]
+            },
+            {
+                id: 'pan',
+                name: '판',
+                tier: 'C',
+                title: '숲과 목동의 신',
+                type: 'Grass',
+                hp: 100,
+                atk: 27,
+                def: 8,
+                spd: 15,
+                relicName: '판의 피리',
+                pixelArtKey: 'pan',
+                skills: [
+                    { name: '숲의 나뭇잎', type: 'Grass', power: 30, maxPp: 20, pp: 20, desc: '날카로운 잎사귀 날리기.' },
+                    { name: '공포의 피리 소리', type: 'Dark', power: 52, maxPp: 12, pp: 12, desc: '음파 공격으로 피해를 줍니다.' },
+                    { name: '야생 충격', type: 'Ground', power: 62, maxPp: 8, pp: 8, desc: '대지를 딛고 돌진합니다.' },
+                    { name: '자연의 가호', type: 'Grass', power: 0, healRatio: 0.28, maxPp: 5, pp: 5, desc: '체력을 28% 회복합니다.' }
+                ]
+            },
+            {
+                id: 'ares',
+                name: '아레스',
+                tier: 'B',
+                title: '투쟁의 군신',
+                type: 'Fire',
+                hp: 130,
+                atk: 36,
+                def: 11,
+                spd: 14,
+                relicName: '투쟁의 창',
+                pixelArtKey: 'ares',
+                skills: [
+                    { name: '화염 베기', type: 'Fire', power: 38, maxPp: 15, pp: 15, desc: '불타는 검으로 상대를 베어버립니다.' },
+                    { name: '광기의 도륙', type: 'Fire', power: 68, maxPp: 10, pp: 10, desc: '강렬한 붉은 화염으로 공격.' },
+                    { name: '전장의 격노', type: 'Fire', power: 0, selfBuffAtk: 7, maxPp: 5, pp: 5, desc: '공격력을 +7 상승시킵니다.' },
+                    { name: '투쟁 사멸격', type: 'Fire', power: 92, maxPp: 4, pp: 4, desc: '군신의 강력한 화염 일격.' }
+                ]
+            },
+            {
+                id: 'artemis',
+                name: '아르테미스',
+                tier: 'B',
+                title: '달과 수렵의 여신',
+                type: 'Flying',
+                hp: 115,
+                atk: 37,
+                def: 9,
+                spd: 19,
+                relicName: '은빛 달의 활',
+                pixelArtKey: 'artemis',
+                skills: [
+                    { name: '은빛 화살', type: 'Flying', power: 36, maxPp: 18, pp: 18, desc: '은빛으로 빛나는 화살 발사.' },
+                    { name: '수렵의 사격', type: 'Flying', power: 70, maxPp: 10, pp: 10, desc: '치명적인 명중 사격.' },
+                    { name: '달빛 회복', type: 'Flying', power: 0, healRatio: 0.32, maxPp: 5, pp: 5, desc: '달빛으로 체력 32% 회복.' },
+                    { name: '은월 유성우', type: 'Flying', power: 95, maxPp: 3, pp: 3, desc: '은빛 화살 세례를 쏟아붓습니다.' }
+                ]
+            },
+            {
+                id: 'anubis',
+                name: '아누비스',
+                tier: 'B',
+                title: '이집트의 인도자',
+                type: 'Ground',
+                hp: 135,
+                atk: 35,
+                def: 13,
+                spd: 12,
+                relicName: '진실의 저울',
+                pixelArtKey: 'anubis',
+                skills: [
+                    { name: '명계 모래 폭풍', type: 'Ground', power: 38, maxPp: 15, pp: 15, desc: '지옥 모래 폭풍을 보냅니다.' },
+                    { name: '지하 매복 습격', type: 'Ground', power: 68, maxPp: 10, pp: 10, desc: '땅속 기습 공격.' },
+                    { name: '심판의 결계', type: 'Dark', power: 0, selfBuffDef: 8, maxPp: 5, pp: 5, desc: '방어력을 +8 상승시킵니다.' },
+                    { name: '대지 초토화 진동', type: 'Ground', power: 90, maxPp: 4, pp: 4, desc: '지각을 뒤흔들어 파괴합니다.' }
+                ]
+            },
+            {
+                id: 'hades',
+                name: '하데스',
+                tier: 'A',
+                title: '명계의 왕',
+                type: 'Dark',
+                hp: 140,
+                atk: 41,
+                def: 12,
+                spd: 13,
+                relicName: '죽음의 투구 (쿠네에)',
+                pixelArtKey: 'hades',
+                skills: [
+                    { name: '명계의 어둠 가시', type: 'Dark', power: 42, maxPp: 15, pp: 15, desc: '어둠의 에너지를 투척합니다.' },
+                    { name: '타르타로스 기습', type: 'Dark', power: 75, maxPp: 10, pp: 10, desc: '그림자 속 기습 공격.' },
+                    { name: '영혼 강탈 충격', type: 'Dark', power: 60, healRatio: 0.25, maxPp: 6, pp: 6, desc: '피해를 주고 체력을 흡수.' },
+                    { name: '명계 사멸의 파멸', type: 'Dark', power: 110, maxPp: 3, pp: 3, desc: '저주의 어둠을 폭발시킵니다.' }
+                ]
+            },
+            {
+                id: 'thor',
+                name: '토르',
+                tier: 'A',
+                title: '아스가르드의 천둥신',
+                type: 'Electric',
+                hp: 160,
+                atk: 42,
+                def: 14,
+                spd: 10,
+                relicName: '성천의 묠니르',
+                pixelArtKey: 'thor',
+                skills: [
+                    { name: '묠니르 타격', type: 'Electric', power: 42, maxPp: 15, pp: 15, desc: '망치에 번개를 실어 타격합니다.' },
+                    { name: '대지 분쇄 충격', type: 'Ground', power: 78, maxPp: 8, pp: 8, desc: '대지를 강타하는 지진파.' },
+                    { name: '아스가르드 요새', type: 'Ground', power: 0, selfBuffDef: 10, maxPp: 5, pp: 5, desc: '방어력을 +10 상승시킵니다.' },
+                    { name: '천둥의 각성 뇌격', type: 'Electric', power: 112, maxPp: 3, pp: 3, desc: '묠니르 전력을 해방합니다.' }
+                ]
+            },
+            {
+                id: 'guan_yu',
+                name: '관우',
+                tier: 'A',
+                title: '동방의 무신',
+                type: 'Fire',
+                hp: 150,
+                atk: 43,
+                def: 13,
+                spd: 12,
+                relicName: '청룡언월도',
+                pixelArtKey: 'guanyu',
+                skills: [
+                    { name: '청룡 언월참', type: 'Fire', power: 44, maxPp: 15, pp: 15, desc: '불길을 두른 칼날 베기.' },
+                    { name: '화염 무신 일격', type: 'Fire', power: 76, maxPp: 8, pp: 8, desc: '불타는 소용돌이 베기.' },
+                    { name: '만부부당의 의기', type: 'Dragon', power: 0, selfBuffAtk: 9, maxPp: 5, pp: 5, desc: '공격력을 +9 올려줍니다.' },
+                    { name: '청룡 대염무', type: 'Fire', power: 112, maxPp: 3, pp: 3, desc: '청룡의 화염을 토해냅니다.' }
+                ]
+            },
+            {
+                id: 'freya',
+                name: '프레이야',
+                tier: 'A',
+                title: '발키리의 여왕',
+                type: 'Flying',
+                hp: 130,
+                atk: 43,
+                def: 10,
+                spd: 18,
+                relicName: '매의 깃털 옷',
+                pixelArtKey: 'freya',
+                skills: [
+                    { name: '바람 여신 칼날', type: 'Flying', power: 40, maxPp: 15, pp: 15, desc: '바람 칼날을 날립니다.' },
+                    { name: '발키리 급강하참', type: 'Flying', power: 75, maxPp: 8, pp: 8, desc: '공중에서 기습 베기.' },
+                    { name: '천상 깃털 치유', type: 'Flying', power: 0, healRatio: 0.38, maxPp: 5, pp: 5, desc: '체력을 38% 회복합니다.' },
+                    { name: '발할라 대폭풍', type: 'Flying', power: 108, maxPp: 3, pp: 3, desc: '거대 폭풍우로 휩쓸어 버립니다.' }
+                ]
+            },
+            {
+                id: 'zeus',
+                name: '제우스',
+                tier: 'S',
+                title: '올림포스의 뇌신',
+                type: 'Electric',
+                hp: 150,
+                atk: 48,
+                def: 13,
+                spd: 15,
+                relicName: '태초의 벼락',
+                pixelArtKey: 'zeus',
+                skills: [
+                    { name: '뇌신의 징벌', type: 'Electric', power: 45, maxPp: 15, pp: 15, desc: '신성한 벼락을 발사합니다.' },
+                    { name: '천상 심판의 뇌격', type: 'Electric', power: 85, maxPp: 5, pp: 5, desc: '하늘에서 강림하는 고위력 천뇌.' },
+                    { name: '올림포스의 가호', type: 'Dragon', power: 0, healRatio: 0.38, maxPp: 5, pp: 5, desc: '체력을 38% 회복합니다.' },
+                    { name: '신벌 제우스 강림', type: 'Electric', power: 125, maxPp: 2, pp: 2, desc: '뇌신의 최고 필살 일격.' }
+                ]
+            },
+            {
+                id: 'poseidon',
+                name: '포세이돈',
+                tier: 'S',
+                title: '바다의 지배자',
+                type: 'Water',
+                hp: 170,
+                atk: 42,
+                def: 16,
+                spd: 11,
+                relicName: '심해의 삼지창',
+                pixelArtKey: 'poseidon',
+                skills: [
+                    { name: '삼지창 수압격', type: 'Water', power: 42, maxPp: 15, pp: 15, desc: '고압 수류를 발사합니다.' },
+                    { name: '대해일 폭류', type: 'Water', power: 80, maxPp: 8, pp: 8, desc: '거친 해일로 강타합니다.' },
+                    { name: '대양의 기원', type: 'Water', power: 0, healRatio: 0.38, maxPp: 5, pp: 5, desc: '체력을 38% 회복합니다.' },
+                    { name: '심해 해룡의 분노', type: 'Water', power: 120, maxPp: 3, pp: 3, desc: '거대 수압 해룡을 소환합니다.' }
+                ]
+            },
+            {
+                id: 'ra',
+                name: '라',
+                tier: 'S',
+                title: '태양의 수호신',
+                type: 'Dragon',
+                hp: 145,
+                atk: 50,
+                def: 11,
+                spd: 14,
+                relicName: '태양의 석장',
+                pixelArtKey: 'ra',
+                skills: [
+                    { name: '태양 광선', type: 'Dragon', power: 48, maxPp: 15, pp: 15, desc: '신성한 태양 광선을 날립니다.' },
+                    { name: '이집트의 고열파', type: 'Dragon', power: 85, maxPp: 8, pp: 8, desc: '고열 태양 파동 공격.' },
+                    { name: '태양의 고속 재생', type: 'Grass', power: 0, healRatio: 0.45, maxPp: 4, pp: 4, desc: '태양 광선으로 체력 45% 회복.' },
+                    { name: '태양신 메테오 심판', type: 'Dragon', power: 130, maxPp: 2, pp: 2, desc: '태양 운석을 내리꽂습니다.' }
+                ]
+            }
+        ];
+
+        const STARTER_GOD_IDS = ['zeus', 'poseidon', 'hades'];
+
+        const CHAOS_BOSS = {
+            id: 'chaos',
+            name: '태초의 신 카오스',
+            tier: 'S',
+            title: '종말의 창조주',
+            type: 'Dark',
+            hp: 1200,
+            maxHp: 1200,
+            atk: 65,
+            def: 26,
+            spd: 15,
+            pixelArtKey: 'chaos',
+            skills: [
+                { name: '공허의 멸망 파동', type: 'Dark', power: 60, maxPp: 10, pp: 10, desc: '어둠의 공허 충격파.' },
+                { name: '종말의 소멸기', type: 'Dragon', power: 100, maxPp: 5, pp: 5, desc: '세계 종말의 사멸격.' }
+            ]
+        };
+
+        /**
+         * WEB AUDIO SYNTHESIZER
+         */
+        class SoundManager {
+            constructor() {
+                this.ctx = null;
+                this.volume = 1.0;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContext) {
+                        this.ctx = new AudioContext();
+                    }
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playTone(freq, type = 'sine', duration = 0.1, gainVal = 0.1) {
+                if (!this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(gainVal * this.volume, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch (e) {}
+            }
+
+            playSelect() {
+                this.playTone(440, 'sine', 0.08, 0.1);
+            }
+
+            playConfirm() {
+                this.playTone(587.33, 'triangle', 0.12, 0.15);
+                setTimeout(() => this.playTone(880, 'triangle', 0.15, 0.15), 60);
+            }
+
+            playHit() {
+                this.playTone(120, 'sawtooth', 0.18, 0.25);
+            }
+
+            playSuperEffective() {
+                this.playTone(523.25, 'square', 0.1, 0.15);
+                setTimeout(() => this.playTone(659.25, 'square', 0.1, 0.15), 80);
+                setTimeout(() => this.playTone(783.99, 'square', 0.15, 0.15), 160);
+            }
+
+            playHeal() {
+                this.playTone(440, 'sine', 0.12, 0.15);
+                setTimeout(() => this.playTone(554.37, 'sine', 0.12, 0.15), 90);
+                setTimeout(() => this.playTone(659.25, 'sine', 0.2, 0.15), 180);
+            }
+
+            playPowerup() {
+                this.playTone(300, 'triangle', 0.1, 0.15);
+                setTimeout(() => this.playTone(450, 'triangle', 0.1, 0.15), 70);
+                setTimeout(() => this.playTone(600, 'triangle', 0.15, 0.15), 140);
+            }
+
+            playRecruit() {
+                this.playTone(523.25, 'sine', 0.1, 0.15);
+                setTimeout(() => this.playTone(659.25, 'sine', 0.1, 0.15), 80);
+                setTimeout(() => this.playTone(783.99, 'sine', 0.1, 0.15), 160);
+                setTimeout(() => this.playTone(1046.50, 'sine', 0.25, 0.18), 240);
+            }
+
+            playVictory() {
+                this.playTone(523.25, 'triangle', 0.15, 0.2);
+                setTimeout(() => this.playTone(659.25, 'triangle', 0.15, 0.2), 150);
+                setTimeout(() => this.playTone(783.99, 'triangle', 0.15, 0.2), 300);
+                setTimeout(() => this.playTone(1046.50, 'triangle', 0.4, 0.25), 450);
+            }
+        }
+
+        const audio = new SoundManager();
+
+        const GameState = {
+            START: 'START',
+            SELECT_GOD: 'SELECT_GOD',
+            BATTLE_TURN: 'BATTLE_TURN',
+            BATTLE_ACTION: 'BATTLE_ACTION',
+            POKEROGUE_SHOP: 'POKEROGUE_SHOP',
+            SETTINGS: 'SETTINGS',
+            GAME_OVER: 'GAME_OVER',
+            VICTORY: 'VICTORY'
+        };
+
+        class Game {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.resizeCanvas();
+
+                this.state = GameState.START;
+                this.previousState = null;
+
+                this.team = [];
+                this.gold = 120;
+                this.currentEnemy = null;
+                this.stage = 1;
+                this.maxStage = 20;
+
+                this.selectIndex = 0;
+                this.skillSelectIndex = 0;
+                this.shopIndex = 0;
+
+                this.soundVolume = 1.0;
+                this.battleSpeed = 1.0;
+
+                this.battleLog = [];
+                this.particles = [];
+
+                this.fixedItems = [];
+                this.randomItems = [];
+
+                this.initEvents();
+                this.loop();
+            }
+
+            resizeCanvas() {
+                const container = document.getElementById('game-container');
+                this.canvas.width = container.clientWidth;
+                this.canvas.height = container.clientHeight;
+            }
+
+            initEvents() {
+                window.addEventListener('resize', () => this.resizeCanvas());
+
+                window.addEventListener('keydown', (e) => {
+                    audio.init();
+
+                    if (e.key === 'Escape') {
+                        this.toggleSettings();
+                        return;
+                    }
+
+                    if (this.state === GameState.SETTINGS) {
+                        if (e.key === 'Space' || e.key === ' ') this.toggleSettings();
+                        return;
+                    }
+
+                    this.handleInput(e);
+                });
+
+                document.querySelectorAll('.touch-btn').forEach(btn => {
+                    const handleTouch = (e) => {
+                        e.preventDefault();
+                        audio.init();
+
+                        const key = btn.getAttribute('data-key');
+                        if (!key) return;
+
+                        if (key === 'Escape') {
+                            this.toggleSettings();
+                            return;
+                        }
+
+                        if (this.state === GameState.SETTINGS) {
+                            if (key === 'Space') this.toggleSettings();
+                            return;
+                        }
+
+                        this.handleInput({ key: key === 'Space' ? ' ' : key });
+                    };
+
+                    btn.addEventListener('touchstart', handleTouch, { passive: false });
+                    btn.addEventListener('click', handleTouch);
+                });
+
+                document.getElementById('btn-start').addEventListener('click', () => {
+                    audio.init();
+                    audio.playConfirm();
+                    this.startGame();
+                });
+
+                document.getElementById('btn-restart').addEventListener('click', () => {
+                    audio.init();
+                    audio.playConfirm();
+                    this.resetGame();
+                });
+
+                document.getElementById('vol-down').addEventListener('click', () => this.adjustVolume(-0.1));
+                document.getElementById('vol-up').addEventListener('click', () => this.adjustVolume(0.1));
+                document.getElementById('speed-1').addEventListener('click', () => this.setSpeed(1.0));
+                document.getElementById('speed-2').addEventListener('click', () => this.setSpeed(1.5));
+                document.getElementById('speed-3').addEventListener('click', () => this.setSpeed(2.0));
+                document.getElementById('btn-close-settings').addEventListener('click', () => this.toggleSettings());
+            }
+
+            adjustVolume(delta) {
+                this.soundVolume = Math.min(1.0, Math.max(0, this.soundVolume + delta));
+                audio.volume = this.soundVolume;
+                document.getElementById('setting-vol-text').innerText = `${Math.round(this.soundVolume * 100)}%`;
+                document.getElementById('vol-bar').style.width = `${this.soundVolume * 100}%`;
+            }
+
+            setSpeed(speed) {
+                this.battleSpeed = speed;
+                document.getElementById('setting-speed-text').innerText = `${speed.toFixed(1)}x`;
+            }
+
+            toggleSettings() {
+                const screen = document.getElementById('settings-screen');
+                if (this.state === GameState.SETTINGS) {
+                    this.state = this.previousState;
+                    screen.classList.add('hidden');
+                } else {
+                    this.previousState = this.state;
+                    this.state = GameState.SETTINGS;
+                    screen.classList.remove('hidden');
+                }
+            }
+
+            handleInput(e) {
+                const key = e.key;
+
+                switch (this.state) {
+                    case GameState.START:
+                        if (key === ' ' || key === 'Space') {
+                            audio.playConfirm();
+                            this.startGame();
+                        }
+                        break;
+
+                    case GameState.SELECT_GOD:
+                        this.handleSelectGodInput(key);
+                        break;
+
+                    case GameState.BATTLE_TURN:
+                        this.handleBattleInput(e);
+                        break;
+
+                    case GameState.POKEROGUE_SHOP:
+                        this.handleShopInput(key);
+                        break;
+
+                    case GameState.GAME_OVER:
+                    case GameState.VICTORY:
+                        if (key === ' ' || key === 'Space') {
+                            audio.playConfirm();
+                            this.resetGame();
+                        }
+                        break;
+                }
+            }
+
+            handleSelectGodInput(key) {
+                const starters = GOD_DATABASE.filter(g => STARTER_GOD_IDS.includes(g.id));
+                const total = starters.length;
+
+                if (key === 'ArrowRight' || key === 'ArrowDown') {
+                    this.selectIndex = (this.selectIndex + 1) % total;
+                    audio.playSelect();
+                } else if (key === 'ArrowLeft' || key === 'ArrowUp') {
+                    this.selectIndex = (this.selectIndex - 1 + total) % total;
+                    audio.playSelect();
+                } else if (key === ' ' || key === 'Space') {
+                    audio.playConfirm();
+                    const chosenTemplate = starters[this.selectIndex];
+                    const firstGod = this.createGodInstance(chosenTemplate, 1);
+                    this.team.push(firstGod);
+
+                    document.getElementById('select-screen').classList.add('hidden');
+                    this.startStage(1);
+                }
+                this.renderGodSelectUI();
+            }
+
+            handleBattleInput(e) {
+                const key = e.key;
+                const activeGod = this.getActiveGod();
+                if (!activeGod) return;
+
+                if (key === 'Shift') {
+                    const living = this.team.filter(g => g.hp > 0);
+                    if (living.length > 1) {
+                        const firstIdx = this.team.findIndex(g => g.hp > 0);
+                        const first = this.team.splice(firstIdx, 1)[0];
+                        this.team.push(first);
+                        this.addLog(`선발 신을 [${this.getActiveGod().name}](으)로 교체했습니다!`);
+                        audio.playSelect();
+                    } else {
+                        this.addLog(`교체 가능한 동료 신이 없습니다!`);
+                    }
+                    return;
+                }
+
+                if (key === 'ArrowRight') {
+                    if (this.skillSelectIndex % 2 === 0) this.skillSelectIndex += 1;
+                    audio.playSelect();
+                } else if (key === 'ArrowLeft') {
+                    if (this.skillSelectIndex % 2 === 1) this.skillSelectIndex -= 1;
+                    audio.playSelect();
+                } else if (key === 'ArrowDown') {
+                    if (this.skillSelectIndex < 2) this.skillSelectIndex += 2;
+                    audio.playSelect();
+                } else if (key === 'ArrowUp') {
+                    if (this.skillSelectIndex >= 2) this.skillSelectIndex -= 2;
+                    audio.playSelect();
+                } else if (key === ' ' || key === 'Space') {
+                    const skill = activeGod.skills[this.skillSelectIndex];
+                    if (skill.pp <= 0) {
+                        this.addLog(`[${skill.name}] 스킬의 PP가 남아있지 않습니다!`);
+                        audio.playHit();
+                        return;
+                    }
+                    audio.playConfirm();
+                    this.executePlayerSkill(this.skillSelectIndex);
+                }
+            }
+
+            handleShopInput(key) {
+                const fixedCount = this.fixedItems.length; // 3
+                const randomCount = this.randomItems.length; // 4
+                const nextStageIdx = fixedCount + randomCount; // 7
+
+                if (key === 'ArrowRight') {
+                    if (this.shopIndex < fixedCount - 1) {
+                        this.shopIndex++;
+                    } else if (this.shopIndex >= fixedCount && this.shopIndex < fixedCount + randomCount - 1) {
+                        this.shopIndex++;
+                    }
+                    audio.playSelect();
+                } else if (key === 'ArrowLeft') {
+                    if (this.shopIndex > 0 && this.shopIndex < fixedCount) {
+                        this.shopIndex--;
+                    } else if (this.shopIndex > fixedCount && this.shopIndex < nextStageIdx) {
+                        this.shopIndex--;
+                    }
+                    audio.playSelect();
+                } else if (key === 'ArrowDown') {
+                    if (this.shopIndex < fixedCount) {
+                        this.shopIndex = Math.min(fixedCount + this.shopIndex, nextStageIdx - 1);
+                        audio.playSelect();
+                    } else if (this.shopIndex >= fixedCount && this.shopIndex < nextStageIdx) {
+                        this.shopIndex = nextStageIdx;
+                        audio.playSelect();
+                    }
+                } else if (key === 'ArrowUp') {
+                    if (this.shopIndex === nextStageIdx) {
+                        this.shopIndex = fixedCount + 1;
+                        audio.playSelect();
+                    } else if (this.shopIndex >= fixedCount) {
+                        this.shopIndex = Math.min(this.shopIndex - fixedCount, fixedCount - 1);
+                        audio.playSelect();
+                    }
+                } else if (key === ' ' || key === 'Space') {
+                    if (this.shopIndex === nextStageIdx) {
+                        audio.playConfirm();
+                        this.startStage(this.stage + 1);
+                        return;
+                    }
+
+                    let item = null;
+                    if (this.shopIndex < fixedCount) {
+                        item = this.fixedItems[this.shopIndex];
+                    } else {
+                        item = this.randomItems[this.shopIndex - fixedCount];
+                    }
+
+                    if (!item || item.purchased) return;
+
+                    if (this.gold >= item.price) {
+                        const success = item.apply(this);
+                        if (success !== false) {
+                            this.gold -= item.price;
+                            item.purchased = true;
+                        }
+                    } else {
+                        this.addLog('골드가 부족하여 구매할 수 없습니다!');
+                        audio.playHit();
+                    }
+                }
+            }
+
+            startGame() {
+                document.getElementById('start-screen').classList.add('hidden');
+                document.getElementById('select-screen').classList.remove('hidden');
+                this.state = GameState.SELECT_GOD;
+                this.renderGodSelectUI();
+            }
+
+            resetGame() {
+                this.team = [];
+                this.gold = 120;
+                this.stage = 1;
+                this.battleLog = [];
+                document.getElementById('end-screen').classList.add('hidden');
+                this.startGame();
+            }
+
+            createGodInstance(template, level = 1) {
+                const statScale = 1 + (level - 1) * 0.14;
+                return {
+                    ...template,
+                    level: level,
+                    hasRelic: false,
+                    maxHp: Math.round(template.hp * statScale),
+                    hp: Math.round(template.hp * statScale),
+                    atk: Math.round(template.atk * statScale),
+                    def: Math.round(template.def * statScale),
+                    spd: Math.round(template.spd * statScale),
+                    skills: template.skills.map(s => ({ ...s, pp: s.maxPp || 10, maxPp: s.maxPp || 10 }))
+                };
+            }
+
+            startStage(stageNum) {
+                this.stage = stageNum;
+                this.battleLog = [`--- WAVE ${this.stage} / ${this.maxStage} ---`];
+
+                if (this.stage === 10) {
+                    this.team.forEach(god => {
+                        god.hp = god.maxHp;
+                        god.skills.forEach(skill => skill.pp = skill.maxPp);
+                    });
+                    this.addLog(`✨ [10 스테이지 도달] 신성한 가호로 모든 신의 체력과 스킬 PP가 회복되었습니다!`);
+                    audio.playHeal();
+                }
+
+                if (this.stage >= this.maxStage) {
+                    this.currentEnemy = { ...CHAOS_BOSS, skills: CHAOS_BOSS.skills.map(s => ({ ...s })) };
+                    this.addLog(`태초의 신 카오스가 강림했습니다!`);
+                } else {
+                    let allowedTiers = ['C'];
+                    if (this.stage >= 15) {
+                        allowedTiers = ['S', 'A'];
+                    } else if (this.stage >= 10) {
+                        allowedTiers = ['A', 'B'];
+                    } else if (this.stage >= 5) {
+                        allowedTiers = ['B', 'C'];
+                    }
+
+                    const availableGods = GOD_DATABASE.filter(g => allowedTiers.includes(g.tier));
+                    const randomGod = availableGods[Math.floor(Math.random() * availableGods.length)] || GOD_DATABASE[0];
+                    this.currentEnemy = this.createGodInstance(randomGod, this.stage);
+                    
+                    const tierInfo = TIERS[this.currentEnemy.tier];
+                    this.addLog(`야생의 [${tierInfo.name}] [${this.currentEnemy.name}] 출현!`);
+                }
+
+                this.state = GameState.BATTLE_TURN;
+                this.skillSelectIndex = 0;
+            }
+
+            getActiveGod() {
+                return this.team.find(g => g.hp > 0);
+            }
+
+            executePlayerSkill(skillIdx) {
+                const attacker = this.getActiveGod();
+                const defender = this.currentEnemy;
+                if (!attacker || !defender) return;
+
+                this.state = GameState.BATTLE_ACTION;
+                const skill = attacker.skills[skillIdx];
+                skill.pp -= 1;
+
+                const mult = getTypeMultiplier(skill.type, defender.type);
+                
+                let damage = 0;
+                if (skill.power > 0) {
+                    const baseDamage = Math.round((attacker.atk * (skill.power / 40)) * (100 / (100 + defender.def)));
+                    damage = Math.max(5, Math.round(baseDamage * mult));
+                    defender.hp = Math.max(0, defender.hp - damage);
+                }
+
+                let logMsg = `${attacker.name}의 [${skill.name}]!`;
+                if (damage > 0) {
+                    logMsg += ` ${defender.name}에게 ${damage} 피해!`;
+                    if (mult > 1.0) {
+                        logMsg += ` (효과가 굉장했다!)`;
+                        audio.playSuperEffective();
+                    } else if (mult < 1.0 && mult > 0) {
+                        logMsg += ` (효과가 별로인 듯하다...)`;
+                        audio.playHit();
+                    } else if (mult === 0) {
+                        logMsg += ` (효과가 전혀 없다...)`;
+                        audio.playHit();
+                    } else {
+                        audio.playHit();
+                    }
+                }
+                this.addLog(logMsg);
+
+                this.spawnParticles(this.canvas.width * 0.72, this.canvas.height * 0.35, TYPES[skill.type]?.color || '#ffffff', 25);
+
+                if (skill.healRatio) {
+                    const healAmt = Math.round(attacker.maxHp * skill.healRatio);
+                    attacker.hp = Math.min(attacker.maxHp, attacker.hp + healAmt);
+                    this.addLog(`${attacker.name}의 체력이 ${healAmt} 회복되었습니다.`);
+                    audio.playHeal();
+                }
+
+                if (skill.selfBuffAtk) {
+                    attacker.atk += skill.selfBuffAtk;
+                    this.addLog(`${attacker.name}의 공격력 +${skill.selfBuffAtk} 상승!`);
+                }
+                if (skill.selfBuffDef) {
+                    attacker.def += skill.selfBuffDef;
+                    this.addLog(`${attacker.name}의 방어력 +${skill.selfBuffDef} 상승!`);
+                }
+
+                setTimeout(() => {
+                    if (defender.hp <= 0) {
+                        this.addLog(`[${defender.name}](을)를 격퇴했습니다!`);
+                        if (this.stage >= this.maxStage) {
+                            this.showEndScreen(true);
+                        } else {
+                            const earnedGold = 90 + this.stage * 18;
+                            this.gold += earnedGold;
+                            this.addLog(`승리 보상: ${earnedGold} Gold 획득!`);
+                            this.generatePokerogueShopItems();
+                            this.state = GameState.POKEROGUE_SHOP;
+                            this.shopIndex = 0;
+                        }
+                    } else {
+                        this.executeEnemyTurn();
+                    }
+                }, 750 / this.battleSpeed);
+            }
+
+            executeEnemyTurn() {
+                const attacker = this.currentEnemy;
+                const defender = this.getActiveGod();
+                if (!defender) return;
+
+                const skill = attacker.skills[Math.floor(Math.random() * attacker.skills.length)];
+                const mult = getTypeMultiplier(skill.type, defender.type);
+                
+                const baseDamage = Math.round((attacker.atk * (skill.power / 40)) * (100 / (100 + defender.def)));
+                const damage = Math.max(5, Math.round(baseDamage * mult));
+                defender.hp = Math.max(0, defender.hp - damage);
+
+                let logMsg = `${attacker.name}의 [${skill.name}]! ${defender.name}에게 ${damage} 피해!`;
+                if (mult > 1.0) logMsg += ` (효과가 굉장했다!)`;
+                this.addLog(logMsg);
+
+                audio.playHit();
+                this.spawnParticles(this.canvas.width * 0.28, this.canvas.height * 0.5, TYPES[skill.type]?.color || '#ef4444', 20);
+
+                setTimeout(() => {
+                    if (!this.getActiveGod()) {
+                        this.showEndScreen(false);
+                    } else {
+                        this.state = GameState.BATTLE_TURN;
+                    }
+                }, 750 / this.battleSpeed);
+            }
+
+            generatePokerogueShopItems() {
+                // 1. [상단] 고정 아이템 (필수 포션 및 부활제)
+                this.fixedItems = [
+                    {
+                        iconType: 'potion_red',
+                        name: '하급 앰브로시아',
+                        price: 35,
+                        rarity: '고정: HP 회복 포션',
+                        rarityColor: '#38bdf8',
+                        desc: '생존한 모든 동료 신의 체력을 30% 회복시킵니다.',
+                        apply: (g) => {
+                            let healed = false;
+                            g.team.forEach(god => {
+                                if (god.hp > 0 && god.hp < god.maxHp) {
+                                    god.hp = Math.min(god.maxHp, god.hp + Math.round(god.maxHp * 0.3));
+                                    healed = true;
+                                }
+                            });
+                            if (!healed) {
+                                g.addLog('치료할 생존 부상 신이 없습니다!');
+                                return false;
+                            }
+                            g.addLog('모든 생존 신들의 체력이 30% 회복되었습니다.');
+                            audio.playHeal();
+                        }
+                    },
+                    {
+                        iconType: 'potion_blue',
+                        name: '신성 PP 영약',
+                        price: 45,
+                        rarity: '고정: PP 회복 포션',
+                        rarityColor: '#facc15',
+                        desc: '생존한 모든 동료 신들의 스킬 PP를 완전히 회복시킵니다.',
+                        apply: (g) => {
+                            let restored = false;
+                            g.team.forEach(god => {
+                                if (god.hp > 0) {
+                                    god.skills.forEach(s => {
+                                        if (s.pp < s.maxPp) {
+                                            s.pp = s.maxPp;
+                                            restored = true;
+                                        }
+                                    });
+                                }
+                            });
+                            if (!restored) {
+                                g.addLog('PP를 회복할 스킬이 없습니다!');
+                                return false;
+                            }
+                            g.addLog('모든 생존 신들의 스킬 PP가 완전히 회복되었습니다!');
+                            audio.playHeal();
+                        }
+                    },
+                    {
+                        iconType: 'potion_gold',
+                        name: '아프로디테 넥타르',
+                        price: 110,
+                        rarity: '고정: 신성 부활 포션',
+                        rarityColor: '#fb7185',
+                        desc: '쓰러진 동료 신 1명을 최대 체력으로 즉시 부활시킵니다.',
+                        apply: (g) => {
+                            const deadGod = g.team.find(god => god.hp <= 0);
+                            if (!deadGod) {
+                                g.addLog('부활시킬 쓰러진 신이 없습니다!');
+                                return false;
+                            }
+                            deadGod.hp = deadGod.maxHp;
+                            g.addLog(`[${deadGod.name}] 신이 신성한 가호로 부활했습니다!`);
+                            audio.playHeal();
+                        }
+                    }
+                ];
+
+                // 2. [중단] 무작위 랜덤 아이템
+                const randomPool = [
+                    {
+                        iconType: 'potion_purple',
+                        name: '상급 앰브로시아',
+                        price: 80,
+                        rarity: '확률: 대형 완쾌 포션',
+                        rarityColor: '#a855f7',
+                        desc: '생존해 있는 모든 동료 신의 체력을 100% 완전히 회복시킵니다.',
+                        apply: (g) => {
+                            let healed = false;
+                            g.team.forEach(god => {
+                                if (god.hp > 0 && god.hp < god.maxHp) {
+                                    god.hp = god.maxHp;
+                                    healed = true;
+                                }
+                            });
+                            if (!healed) {
+                                g.addLog('치료할 생존 부상 신이 없습니다!');
+                                return false;
+                            }
+                            g.addLog('모든 생존 신들의 체력이 완전히 회복되었습니다!');
+                            audio.playHeal();
+                        }
+                    },
+                    {
+                        iconType: 'elixir_hp',
+                        name: '신성 체력의 영약',
+                        price: 60,
+                        rarity: '확률: HP 영구 강화',
+                        rarityColor: '#22c55e',
+                        desc: '생존해 있는 모든 동료 신들의 최대 체력을 +30 상승시킵니다.',
+                        apply: (g) => {
+                            g.team.forEach(god => {
+                                god.maxHp += 30;
+                                god.hp += 30;
+                            });
+                            g.addLog('팀 전체의 최대 체력이 +30 상승했습니다!');
+                            audio.playPowerup();
+                        }
+                    },
+                    {
+                        iconType: 'elixir_atk',
+                        name: '신화의 근력 비약',
+                        price: 70,
+                        rarity: '확률: ATK 영구 강화',
+                        rarityColor: '#f87171',
+                        desc: '팀 전체 신들의 공격력을 영구히 +8 상승시킵니다.',
+                        apply: (g) => {
+                            g.team.forEach(god => god.atk += 8);
+                            g.addLog('팀 전체의 공격력이 영구히 +8 상승했습니다!');
+                            audio.playPowerup();
+                        }
+                    },
+                    {
+                        iconType: 'shield',
+                        name: '수호 방어의 결계',
+                        price: 65,
+                        rarity: '확률: DEF 영구 강화',
+                        rarityColor: '#38bdf8',
+                        desc: '팀 전체 신들의 방어력을 영구히 +6 상승시킵니다.',
+                        apply: (g) => {
+                            g.team.forEach(god => god.def += 6);
+                            g.addLog('팀 전체의 방어력이 영구히 +6 상승했습니다!');
+                            audio.playPowerup();
+                        }
+                    }
+                ];
+
+                // 상대 신 영입 계약서
+                if (this.currentEnemy && this.currentEnemy.id !== 'chaos') {
+                    const enemyGod = this.currentEnemy;
+                    const tierInfo = TIERS[enemyGod.tier] || TIERS.C;
+                    randomPool.push({
+                        iconType: 'scroll',
+                        name: `신화 영입: ${enemyGod.name}`,
+                        price: enemyGod.tier === 'S' ? 200 : (enemyGod.tier === 'A' ? 150 : 100),
+                        rarity: `확률: [${tierInfo.name}] 영입`,
+                        rarityColor: tierInfo.color,
+                        desc: `격퇴한 [${tierInfo.name}] [${enemyGod.name}] 신과 계약을 맺어 팀에 정식 영입합니다.`,
+                        apply: (g) => {
+                            if (g.team.length >= 6) {
+                                g.addLog('동료 슬롯이 가득 찼습니다 (최대 6명)!');
+                                return false;
+                            }
+                            const newMember = g.createGodInstance(
+                                GOD_DATABASE.find(god => god.id === enemyGod.id) || enemyGod,
+                                g.stage
+                            );
+                            g.team.push(newMember);
+                            g.addLog(`[${newMember.name}] 신을 포섭하여 팀 정식 멤버로 합류시켰습니다!`);
+                            audio.playRecruit();
+                        }
+                    });
+                }
+
+                // 성물 발견
+                const godNeedingRelic = this.team.find(god => god.hp > 0 && !god.hasRelic);
+                if (godNeedingRelic) {
+                    let relicIcon = 'weapon_lightning';
+                    if (godNeedingRelic.id === 'zeus') relicIcon = 'weapon_lightning';
+                    else if (godNeedingRelic.id === 'poseidon') relicIcon = 'weapon_trident';
+                    else relicIcon = 'weapon_relic';
+
+                    randomPool.push({
+                        iconType: relicIcon,
+                        name: `성물: ${godNeedingRelic.relicName}`,
+                        price: 150,
+                        rarity: '확률: 무기/성물 각성',
+                        rarityColor: '#eab308',
+                        desc: `[${godNeedingRelic.name}] 신의 전용 무기 [${godNeedingRelic.relicName}](을)를 각성합니다. (ATK+20, HP+40)`,
+                        apply: (g) => {
+                            const targetGod = g.team.find(god => god.id === godNeedingRelic.id);
+                            if (!targetGod) return false;
+                            targetGod.hasRelic = true;
+                            targetGod.atk += 20;
+                            targetGod.maxHp += 40;
+                            targetGod.hp += 40;
+                            g.addLog(`⚡ [${targetGod.name}] 신이 전설의 성물 [${targetGod.relicName}](을)를 각성했습니다!`);
+                            audio.playPowerup();
+                        }
+                    });
+                }
+
+                const shuffled = [...randomPool].sort(() => 0.5 - Math.random());
+                this.randomItems = shuffled.slice(0, 4).map(i => ({ ...i, purchased: false }));
+                this.fixedItems = this.fixedItems.map(i => ({ ...i, purchased: false }));
+            }
+
+            addLog(text) {
+                this.battleLog.push(text);
+                if (this.battleLog.length > 5) {
+                    this.battleLog.shift();
+                }
+            }
+
+            showEndScreen(isVictory) {
+                this.state = isVictory ? GameState.VICTORY : GameState.GAME_OVER;
+                const screen = document.getElementById('end-screen');
+                const title = document.getElementById('end-title');
+                const subtitle = document.getElementById('end-subtitle');
+                const stats = document.getElementById('end-stats');
+
+                screen.classList.remove('hidden');
+
+                if (isVictory) {
+                    title.innerText = 'VICTORY';
+                    title.className = 'text-5xl font-black text-amber-400 glow-gold mb-2';
+                    subtitle.innerText = '태초의 신 카오스를 격퇴하고 신들의 세계에 평화를 되찾았습니다!';
+                    audio.playVictory();
+                } else {
+                    title.innerText = 'GAME OVER';
+                    title.className = 'text-5xl font-black text-red-600 glow-red mb-2';
+                    subtitle.innerText = '모든 신이 전사하고, 세계는 카오스의 어둠 속에 삼켜졌습니다.';
+                }
+
+                stats.innerHTML = `
+                    <div class="flex justify-between border-b border-slate-800 pb-1">
+                        <span>최종 도달 웨이브</span>
+                        <span class="text-amber-400 font-bold">${this.stage} / ${this.maxStage}</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-800 pb-1">
+                        <span>보유 골드</span>
+                        <span class="text-amber-400 font-bold">${this.gold} Gold</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-800 pb-1">
+                        <span>생존 신</span>
+                        <span class="text-amber-400 font-bold">${this.team.filter(g => g.hp > 0).length} / ${this.team.length} 명</span>
+                    </div>
+                `;
+            }
+
+            spawnParticles(x, y, color, count) {
+                for (let i = 0; i < count; i++) {
+                    this.particles.push({
+                        x, y,
+                        vx: (Math.random() - 0.5) * 8,
+                        vy: (Math.random() - 0.5) * 8,
+                        radius: Math.random() * 4 + 2,
+                        color,
+                        alpha: 1,
+                        life: 28
+                    });
+                }
+            }
+
+            updateParticles() {
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    const p = this.particles[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.alpha -= 1 / p.life;
+                    if (p.alpha <= 0) {
+                        this.particles.splice(i, 1);
+                    }
+                }
+            }
+
+            drawParticles() {
+                this.particles.forEach(p => {
+                    this.ctx.save();
+                    this.ctx.globalAlpha = p.alpha;
+                    this.ctx.fillStyle = p.color;
+                    this.ctx.fillRect(p.x, p.y, p.radius * 2, p.radius * 2);
+                    this.ctx.restore();
+                });
+            }
+
+            drawGodPixelArt(typeKey, x, y, scale = 4.5) {
+                this.ctx.save();
+                
+                const C = {
+                    _: 'transparent',
+                    K: '#090a0f',
+                    S: '#facc15',
+                    F: '#fed7aa',
+                    E: '#38bdf8',
+                    R: '#dc2626',
+                    W: '#f8fafc',
+                    Z: '#0284c7',
+                    T: '#92400e',
+                    H: '#581c87',
+                    G: '#15803d',
+                    V: '#a7f3d0',
+                    A: '#d97706',
+                    M: '#94a3b8',
+                    X: '#7f1d1d',
+                    P: '#c084fc'
+                };
+
+                const sprites = {
+                    zeus: [
+                        "____SSSSSSSS____",
+                        "___SFFFFFFFFS___",
+                        "__SFFKEFFKEFFS__",
+                        "__SFFFFFFSFFFS__",
+                        "__RRWWWWWWWWRE__",
+                        "_RRRWWZZZZWWRRE_",
+                        "_RRRWWZZZZWWRRE_",
+                        "_RRRWWWWWWWWRRR_",
+                        "__RRWWWWWWWWRE__",
+                        "__RRWWWWWWWWRE__",
+                        "___RRWW__WWRR___",
+                        "___TTTT__TTTT___",
+                        "___TTTT__TTTT___",
+                        "________________",
+                        "________________",
+                        "________________"
+                    ],
+                    poseidon: [
+                        "___Z____Z____Z__",
+                        "___ZZ__ZZZ__ZZ__",
+                        "____ZZZZZZZZ____",
+                        "___SFFFFFFFFS___",
+                        "__SFFKEFFKEFFS__",
+                        "__SFFFFFFFFFFS__",
+                        "__ZZZZZZZZZZZZ__",
+                        "_ZZZZZZWWZZZZZZ_",
+                        "_ZZZZZZWWZZZZZZ_",
+                        "_ZZZZZZZZZZZZZZ_",
+                        "__ZZZZZZZZZZZZ__",
+                        "__ZZZZZZZZZZZZ__",
+                        "___ZZZZ__ZZZZ___",
+                        "___KKKK__KKKK___",
+                        "________________",
+                        "________________"
+                    ],
+                    hades: [
+                        "____HHHHHHHH____",
+                        "___HFFFFFFFFH___",
+                        "__HFFKXFFKXFFH__",
+                        "__HFFFFFFFFFFH__",
+                        "__HHHHHHHHHHHH__",
+                        "_HHHHHXHXHHHHHH_",
+                        "_HHHHHXHXHHHHHH_",
+                        "_HHHHHHHHHHHHHH_",
+                        "__HHHHHHHHHHHH__",
+                        "__HHHHHHHHHHHH__",
+                        "___HHHH__HHHH___",
+                        "___KKKK__KKKK___",
+                        "________________",
+                        "________________"
+                    ],
+                    hermes: [
+                        "____VVVVVVVV____",
+                        "___VFFFFFFFFV___",
+                        "__VFFKEFFKEFFV__",
+                        "__VFFFFFFFFFFV__",
+                        "__WWWWWWWWWWWW__",
+                        "_WWWWWWVVWWWWWW_",
+                        "_WWWWWWVVWWWWWW_",
+                        "_WWWWWWWWWWWWWW_",
+                        "__WWWWWWWWWWWW__",
+                        "__WWWWWWWWWWWW__",
+                        "___VVVV__VVVV___",
+                        "___SSSS__SSSS___",
+                        "________________",
+                        "________________"
+                    ],
+                    dionysus: [
+                        "____PPPPPPPP____",
+                        "___PFFFFFFFFP___",
+                        "__PFFKEFFKEFFP__",
+                        "__PFFFFFFFFFFP__",
+                        "__GGGGGGGGGGGG__",
+                        "_GGGGGGPPGGGGGG_",
+                        "_GGGGGGPPGGGGGG_",
+                        "_GGGGGGGGGGGGGG_",
+                        "__GGGGGGGGGGGG__",
+                        "__GGGGGGGGGGGG__",
+                        "___GGGG__GGGG___",
+                        "___KKKK__KKKK___",
+                        "________________",
+                        "________________"
+                    ],
+                    pan: [
+                        "____GGGGGGGG____",
+                        "___GFFFFFFFFG___",
+                        "__GFFKEFFKEFFG__",
+                        "__GFFFFFFSFFFG__",
+                        "__TTTTTTTTTTTT__",
+                        "_TTTTTTGGTTTTTT_",
+                        "_TTTTTTGGTTTTTT_",
+                        "_TTTTTTTTTTTTTT_",
+                        "__TTTTTTTTTTTT__",
+                        "__TTTTTTTTTTTT__",
+                        "___TTTT__TTTT___",
+                        "___KKKK__KKKK___",
+                        "________________",
+                        "________________"
+                    ],
+                    ares: [
+                        "____RRRRRRRR____",
+                        "___RFFFFFFFFR___",
+                        "__RFFKXFFKXFFR__",
+                        "__RFFFFFFFFFFR__",
+                        "__RRRRRRRRRRRR__",
+                        "_RRRRRRSSRRRRRR_",
+                        "_RRRRRRSSRRRRRR_",
+                        "_RRRRRRRRRRRRRR_",
+                        "__RRRRRRRRRRRR__",
+                        "__RRRRRRRRRRRR__",
+                        "___RRRR__RRRR___",
+                        "___KKKK__KKKK___",
+                        "________________",
+                        "________________"
+                    ],
+                    artemis: [
+                        "____WWWWWWWW____",
+                        "___WFFFFFFFFW___",
+                        "__WFFKEFFKEFFW__",
+                        "__WFFFFFFFFFFW__",
+                        "__VVVVVVVVVVVV__",
+                        "_VVVVVVWWVVVVVV_",
+                        "_VVVVVVWWVVVVVV_",
+                        "_VVVVVVVVVVVVVV_",
+                        "__VVVVVVVVVVVV__",
+                        "__VVVVVVVVVVVV__",
+                        "___VVVV__VVVV___",
+                        "___KKKK__KKKK___",
+                        "________________",
+                        "________________"
+                    ],
+                    thor: [
+                        "____MMMMMMMM____",
+                        "___SFFFFFFFFS___",
+                        "__SFFKEFFKEFFS__",
+                        "__SFFFFFFSFFFS__",
+                        "__TTTTTTTTTTTT__",
+                        "_TTTTTTSSSTTTTT_",
+                        "_TTTTTTSSSTTTTT_",
+                        "_TTTTTTTTTTTTTT_",
+                        "__TTTTTTTTTTTT__",
+                        "__TTTTTTTTTTTT__",
+                        "___TTTT__TTTT___",
+                        "___KKKK__KKKK___",
+                        "________________",
+                        "________________"
+                    ],
+                    guanyu: [
+                        "____GGGGGGGG____",
+                        "___GFFFFFFFFG___",
+                        "__GFFKKFFKKFFG__",
+                        "__GFFFFFFSFFFG__",
+                        "__GGGGGGGGGGGM__",
+                        "_GGGGGGSSGGGGGM_",
+                        "_GGGGGGSSGGGGGM_",
+                        "_GGGGGGGGGGGGGM_",
+                        "__GGGGGGGGGGGG__",
+                        "__GGGGGGGGGGGG__",
+                        "___GGGG__GGGG___",
+                        "___KKKK__KKKK___",
+                        "________________",
+                        "________________"
+                    ],
+                    freya: [
+                        "____VVVVVVVV____",
+                        "___VFFFFFFFFV___",
+                        "__VFFKEFFKEFFV__",
+                        "__VFFFFFFFFFFV__",
+                        "__VVVVWWWWVVVV__",
+                        "_VVVVVWWWWVVVVV_",
+                        "_VVVVVWWWWVVVVV_",
+                        "_VVVVVVVVVVVVVV_",
+                        "__VVVVVVVVVVVV__",
+                        "__VVVVVVVVVVVV__",
+                        "___VVVV__VVVV___",
+                        "___WWWW__WWWW___",
+                        "________________",
+                        "________________"
+                    ],
+                    ra: [
+                        "____SSSSSSSS____",
+                        "___SFFFFFFFFS___",
+                        "__SFFKEFFKEFFS__",
+                        "__SFFFFFFSFFFS__",
+                        "__AAAAAAAAAAAA__",
+                        "_AAAAAASSSAAAAA_",
+                        "_AAAAAASSSAAAAA_",
+                        "_AAAAAAAAAAAAAA_",
+                        "__AAAAAAAAAAAA__",
+                        "__AAAAAAAAAAAA__",
+                        "___AAAA__AAAA___",
+                        "___KKKK__KKKK___",
+                        "________________",
+                        "________________"
+                    ],
+                    anubis: [
+                        "____AAAAAAAA____",
+                        "___AFFFFFFFFA___",
+                        "__AFFKKFFKKFFA__",
+                        "__AFFFFFFFFFFA__",
+                        "__KKKKKKKKKKKK__",
+                        "_KKKKKKSSKKKKKK_",
+                        "_KKKKKKSSKKKKKK_",
+                        "_KKKKKKKKKKKKKK_",
+                        "__KKKKKKKKKKKK__",
+                        "__KKKKKKKKKKKK__",
+                        "___KKKK__KKKK___",
+                        "___AAAA__AAAA___",
+                        "________________",
+                        "________________"
+                    ],
+                    chaos: [
+                        "XXXXKKKKKKKKXXXX",
+                        "XXXKXXXXXXXXKXXX",
+                        "XXKXXKKKKKKXXKXX",
+                        "XXKXXKXXXXKXXKXX",
+                        "XXKKKKKKKKKKKKXX",
+                        "XKKKKKXXKKKKKKKX",
+                        "XKKKKKXXKKKKKKKX",
+                        "XKKKKKKKKKKKKKKX",
+                        "XXKKKKKKKKKKKKXX",
+                        "XXKKKKKKKKKKKKXX",
+                        "XXXKKKK__KKKKXXX",
+                        "XXXXKK____KKXXXX",
+                        "________________",
+                        "________________"
+                    ]
+                };
+
+                const grid = sprites[typeKey] || sprites['zeus'];
+                const rows = Math.min(16, grid ? grid.length : 0);
+                const cols = 16;
+
+                const startX = x - (cols * scale) / 2;
+                const startY = y - (rows * scale) / 2;
+
+                for (let r = 0; r < rows; r++) {
+                    const rowStr = grid[r];
+                    if (!rowStr) continue;
+                    for (let c = 0; c < Math.min(cols, rowStr.length); c++) {
+                        const char = rowStr[c];
+                        if (char && char !== '_') {
+                            this.ctx.fillStyle = C[char] || '#ffffff';
+                            this.ctx.fillRect(startX + c * scale, startY + r * scale, scale, scale);
+                        }
+                    }
+                }
+
+                this.ctx.restore();
+            }
+
+            // Custom Icon Drawing for Shop Items
+            drawItemIcon(iconType, cx, cy) {
+                this.ctx.save();
+                this.ctx.translate(cx, cy);
+
+                if (iconType.startsWith('potion')) {
+                    // Draw Potion Bottle
+                    let liquidColor = '#f87171';
+                    if (iconType === 'potion_blue') liquidColor = '#38bdf8';
+                    if (iconType === 'potion_gold') liquidColor = '#facc15';
+                    if (iconType === 'potion_purple') liquidColor = '#c084fc';
+
+                    // Cork
+                    this.ctx.fillStyle = '#b45309';
+                    this.ctx.fillRect(-3, -15, 6, 3);
+                    // Bottle Rim & Neck
+                    this.ctx.fillStyle = '#94a3b8';
+                    this.ctx.fillRect(-4, -12, 8, 3);
+                    this.ctx.fillRect(-2, -9, 4, 3);
+                    // Bottle Body (glass)
+                    this.ctx.beginPath();
+                    this.ctx.arc(0, 2, 11, 0, Math.PI * 2);
+                    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+                    this.ctx.fill();
+                    this.ctx.strokeStyle = '#e2e8f0';
+                    this.ctx.lineWidth = 1.5;
+                    this.ctx.stroke();
+
+                    // Liquid inside
+                    this.ctx.beginPath();
+                    this.ctx.arc(0, 3, 8.5, 0, Math.PI * 2);
+                    this.ctx.fillStyle = liquidColor;
+                    this.ctx.fill();
+
+                    // Shine
+                    this.ctx.fillStyle = '#ffffff';
+                    this.ctx.fillRect(-4, -2, 3, 3);
+                } else if (iconType === 'weapon_lightning') {
+                    // Zeus Lightning Bolt
+                    this.ctx.fillStyle = '#facc15';
+                    this.ctx.shadowColor = '#fde047';
+                    this.ctx.shadowBlur = 8;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(3, -15);
+                    this.ctx.lineTo(-7, -1);
+                    this.ctx.lineTo(-1, -1);
+                    this.ctx.lineTo(-5, 15);
+                    this.ctx.lineTo(7, 0);
+                    this.ctx.lineTo(1, 0);
+                    this.ctx.closePath();
+                    this.ctx.fill();
+                } else if (iconType === 'weapon_trident') {
+                    // Trident
+                    this.ctx.fillStyle = '#38bdf8';
+                    this.ctx.shadowColor = '#0284c7';
+                    this.ctx.shadowBlur = 6;
+                    this.ctx.fillRect(-1.5, -14, 3, 28); // handle
+                    // Prongs
+                    this.ctx.fillRect(-8, -14, 2, 10);
+                    this.ctx.fillRect(6, -14, 2, 10);
+                    this.ctx.fillRect(-8, -5, 16, 2);
+                } else if (iconType === 'weapon_relic') {
+                    // Divine Relic Artifact
+                    this.ctx.fillStyle = '#fbbf24';
+                    this.ctx.shadowColor = '#f59e0b';
+                    this.ctx.shadowBlur = 8;
+                    this.ctx.beginPath();
+                    this.ctx.arc(0, 0, 10, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    this.ctx.fillStyle = '#1e1b4b';
+                    this.ctx.beginPath();
+                    this.ctx.arc(0, 0, 5, 0, Math.PI * 2);
+                    this.ctx.fill();
+                } else if (iconType === 'elixir_hp' || iconType === 'elixir_atk') {
+                    // Elixir / Pill
+                    const col = iconType === 'elixir_hp' ? '#4ade80' : '#f87171';
+                    this.ctx.fillStyle = col;
+                    this.ctx.beginPath();
+                    this.ctx.roundRect(-6, -12, 12, 24, 6);
+                    this.ctx.fill();
+                    this.ctx.fillStyle = '#ffffff';
+                    this.ctx.fillRect(-6, -12, 12, 12);
+                } else if (iconType === 'shield') {
+                    // Shield
+                    this.ctx.fillStyle = '#38bdf8';
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, -12);
+                    this.ctx.lineTo(10, -7);
+                    this.ctx.lineTo(8, 6);
+                    this.ctx.lineTo(0, 13);
+                    this.ctx.lineTo(-8, 6);
+                    this.ctx.lineTo(-10, -7);
+                    this.ctx.closePath();
+                    this.ctx.fill();
+                    this.ctx.strokeStyle = '#ffffff';
+                    this.ctx.lineWidth = 1.5;
+                    this.ctx.stroke();
+                } else if (iconType === 'scroll') {
+                    // Recruit Contract Scroll
+                    this.ctx.fillStyle = '#fde047';
+                    this.ctx.fillRect(-8, -11, 16, 22);
+                    this.ctx.fillStyle = '#92400e';
+                    this.ctx.fillRect(-10, -13, 20, 3);
+                    this.ctx.fillRect(-10, 10, 20, 3);
+                    this.ctx.fillStyle = '#78350f';
+                    this.ctx.fillRect(-5, -6, 10, 2);
+                    this.ctx.fillRect(-5, -1, 10, 2);
+                    this.ctx.fillRect(-5, 4, 10, 2);
+                }
+
+                this.ctx.restore();
+            }
+
+            renderGodSelectUI() {
+                const container = document.getElementById('god-select-list');
+                container.innerHTML = '';
+
+                const starters = GOD_DATABASE.filter(g => STARTER_GOD_IDS.includes(g.id));
+
+                starters.forEach((god, index) => {
+                    const isSelected = index === this.selectIndex;
+                    const typeInfo = TYPES[god.type];
+                    const tierInfo = TIERS[god.tier] || TIERS.S;
+
+                    const card = document.createElement('div');
+                    card.className = `p-4 rounded-xl border-2 bg-slate-900/90 transition-all cursor-pointer ${
+                        isSelected ? 'god-card-selected border-amber-400' : 'border-slate-800 hover:border-slate-600'
+                    }`;
+
+                    card.innerHTML = `
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center gap-1.5">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-black" style="background:${tierInfo.bg}; color:${tierInfo.color}">
+                                    ${god.tier}급
+                                </span>
+                                <h3 class="font-bold text-white text-base">${god.name}</h3>
+                            </div>
+                            <span class="px-2.5 py-0.5 rounded text-[11px] font-bold" style="background:${typeInfo.bg}; color:${typeInfo.color}">
+                                ${typeInfo.name}
+                            </span>
+                        </div>
+                        <p class="text-xs text-amber-400 font-semibold mb-2">${god.title}</p>
+                        <div class="text-xs text-purple-300 font-semibold mb-2">전용 성물: ${god.relicName}</div>
+                        <div class="text-xs text-gray-400 space-y-1 mb-3">
+                            <div>HP: ${god.hp} | ATK: ${god.atk}</div>
+                            <div>DEF: ${god.def} | SPD: ${god.spd}</div>
+                        </div>
+                        <div class="border-t border-slate-800 pt-2">
+                            <p class="text-xs font-bold text-amber-300 mb-1">주신 전용 스킬 4종:</p>
+                            <p class="text-[10px] text-gray-400 leading-tight">${god.skills.map(s => s.name).join('<br>')}</p>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+            }
+
+            render() {
+                this.ctx.fillStyle = '#030305';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                if (this.state === GameState.START || this.state === GameState.SELECT_GOD) {
+                    this.drawBackgroundArt();
+                    return;
+                }
+
+                this.drawBattleArena();
+                this.drawGods();
+                this.drawUI();
+                this.drawParticles();
+
+                if (this.state === GameState.POKEROGUE_SHOP) {
+                    this.drawPokerogueShopOverlay();
+                }
+            }
+
+            drawBackgroundArt() {
+                const grad = this.ctx.createRadialGradient(
+                    this.canvas.width / 2, this.canvas.height / 2, 50,
+                    this.canvas.width / 2, this.canvas.height / 2, 400
+                );
+                grad.addColorStop(0, 'rgba(234, 179, 8, 0.12)');
+                grad.addColorStop(1, 'rgba(3, 3, 5, 0)');
+                this.ctx.fillStyle = grad;
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            }
+
+            drawBattleArena() {
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+
+                if (this.stage >= 20) {
+                    const bgGrad = this.ctx.createRadialGradient(w / 2, h / 2, 50, w / 2, h / 2, Math.max(w, h));
+                    bgGrad.addColorStop(0, '#1e1b4b');
+                    bgGrad.addColorStop(0.5, '#090514');
+                    bgGrad.addColorStop(1, '#020005');
+                    this.ctx.fillStyle = bgGrad;
+                    this.ctx.fillRect(0, 0, w, h);
+
+                    this.ctx.save();
+                    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                    for (let i = 0; i < 40; i++) {
+                        const starX = (Math.sin(i * 99 + Date.now() * 0.0005) * 0.5 + 0.5) * w;
+                        const starY = (Math.cos(i * 33 + Date.now() * 0.0003) * 0.5 + 0.5) * h;
+                        const starSize = (i % 3) + 1;
+                        this.ctx.fillRect(starX, starY, starSize, starSize);
+                    }
+                    this.ctx.restore();
+                } else if (this.stage >= 10) {
+                    const bgGrad = this.ctx.createLinearGradient(0, 0, 0, h);
+                    bgGrad.addColorStop(0, '#1e293b');
+                    bgGrad.addColorStop(0.5, '#334155');
+                    bgGrad.addColorStop(1, '#0f172a');
+                    this.ctx.fillStyle = bgGrad;
+                    this.ctx.fillRect(0, 0, w, h);
+
+                    const templeGlow = this.ctx.createRadialGradient(w / 2, 0, 10, w / 2, h / 2, w / 1.5);
+                    templeGlow.addColorStop(0, 'rgba(251, 191, 36, 0.18)');
+                    templeGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                    this.ctx.fillStyle = templeGlow;
+                    this.ctx.fillRect(0, 0, w, h);
+                } else {
+                    const bgGrad = this.ctx.createLinearGradient(0, 0, 0, h);
+                    bgGrad.addColorStop(0, '#0f172a');
+                    bgGrad.addColorStop(1, '#020617');
+                    this.ctx.fillStyle = bgGrad;
+                    this.ctx.fillRect(0, 0, w, h);
+                }
+
+                this.ctx.fillStyle = this.stage >= 20 ? '#c084fc' : '#f59e0b';
+                this.ctx.font = 'bold 16px "Noto Sans KR"';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText(`WAVE ${this.stage} / ${this.maxStage}`, w / 2, 28);
+
+                this.ctx.fillStyle = '#fbbf24';
+                this.ctx.font = 'bold 13px "Noto Sans KR"';
+                this.ctx.fillText(`소지 골드: ${this.gold} Gold`, w / 2, 48);
+
+                const platformColor = this.stage >= 20 ? '#31104b' : (this.stage >= 10 ? '#475569' : '#1e293b');
+                this.ctx.fillStyle = platformColor;
+                this.ctx.beginPath();
+                this.ctx.ellipse(w * 0.28, h * 0.52, 110, 25, 0, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                this.ctx.beginPath();
+                this.ctx.ellipse(w * 0.72, h * 0.36, 110, 25, 0, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
+
+            drawGods() {
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+
+                const activeGod = this.getActiveGod();
+                if (activeGod) {
+                    this.drawGodUnit(activeGod, w * 0.28, h * 0.36, true);
+                }
+
+                if (this.currentEnemy) {
+                    this.drawGodUnit(this.currentEnemy, w * 0.72, h * 0.20, false);
+                }
+            }
+
+            drawGodUnit(god, x, y, isPlayer) {
+                this.drawGodPixelArt(god.pixelArtKey || 'zeus', x, y, 4.5);
+
+                const barWidth = 140;
+                const barHeight = 10;
+                const barX = x - barWidth / 2;
+                const barY = y - 75;
+
+                const typeInfo = TYPES[god.type] || TYPES.Electric;
+                const tierInfo = TIERS[god.tier] || TIERS.C;
+
+                this.ctx.fillStyle = tierInfo.color;
+                this.ctx.font = 'bold 11px "Noto Sans KR"';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText(`[${god.tier}급]`, x - 70, barY - 16);
+
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.font = 'bold 13px "Noto Sans KR"';
+                this.ctx.fillText(`${god.name} ${god.hasRelic ? '★' : ''}`, x, barY - 16);
+
+                this.ctx.fillStyle = typeInfo.bg;
+                this.ctx.fillRect(x + 40, barY - 27, 36, 15);
+                this.ctx.fillStyle = typeInfo.color;
+                this.ctx.font = 'bold 10px "Noto Sans KR"';
+                this.ctx.fillText(typeInfo.name, x + 58, barY - 16);
+
+                this.ctx.fillStyle = '#334155';
+                this.ctx.fillRect(barX, barY, barWidth, barHeight);
+
+                const hpRatio = Math.max(0, god.hp / god.maxHp);
+                this.ctx.fillStyle = hpRatio > 0.5 ? '#22c55e' : (hpRatio > 0.2 ? '#eab308' : '#ef4444');
+                this.ctx.fillRect(barX, barY, barWidth * hpRatio, barHeight);
+
+                this.ctx.strokeStyle = '#475569';
+                this.ctx.strokeRect(barX, barY, barWidth, barHeight);
+
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.font = '9px "Noto Sans KR"';
+                this.ctx.fillText(`${god.hp} / ${god.maxHp}`, x, barY + 8);
+            }
+
+            drawUI() {
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+
+                this.ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+                this.ctx.strokeStyle = '#334155';
+                this.ctx.fillRect(15, h - 170, 220, 155);
+                this.ctx.strokeRect(15, h - 170, 220, 155);
+
+                this.ctx.fillStyle = '#f59e0b';
+                this.ctx.font = 'bold 12px "Noto Sans KR"';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`아군 신 (${this.team.length}/6) [Shift: 교체]`, 22, h - 152);
+
+                this.team.forEach((god, i) => {
+                    const rowY = h - 132 + i * 20;
+                    const isCurrent = god === this.getActiveGod();
+                    const tierInfo = TIERS[god.tier] || TIERS.C;
+
+                    this.ctx.fillStyle = tierInfo.color;
+                    this.ctx.font = 'bold 10px "Noto Sans KR"';
+                    this.ctx.fillText(`[${god.tier}]`, 25, rowY);
+
+                    this.ctx.fillStyle = god.hp <= 0 ? '#ef4444' : (isCurrent ? '#fbbf24' : '#d1d5db');
+                    this.ctx.font = isCurrent ? 'bold 11px "Noto Sans KR"' : '11px "Noto Sans KR"';
+                    this.ctx.fillText(`${isCurrent ? '▶' : ''}${god.name} ${god.hp <= 0 ? '(전사)' : ''}`, 48, rowY);
+
+                    this.ctx.textAlign = 'right';
+                    this.ctx.fillText(`${god.hp}/${god.maxHp}`, 225, rowY);
+                    this.ctx.textAlign = 'left';
+                });
+
+                const activeGod = this.getActiveGod();
+                const skillW = 410;
+                const skillH = 155;
+                const skillX = 245;
+                const skillY = h - 170;
+
+                this.ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+                this.ctx.fillRect(skillX, skillY, skillW, skillH);
+                this.ctx.strokeRect(skillX, skillY, skillW, skillH);
+
+                if (activeGod && this.state === GameState.BATTLE_TURN) {
+                    activeGod.skills.forEach((skill, idx) => {
+                        const col = idx % 2;
+                        const row = Math.floor(idx / 2);
+                        const cardX = skillX + 10 + col * 195;
+                        const cardY = skillY + 12 + row * 68;
+                        const isSelected = idx === this.skillSelectIndex;
+
+                        const typeInfo = TYPES[skill.type] || TYPES.Electric;
+
+                        this.ctx.fillStyle = isSelected ? 'rgba(245, 158, 11, 0.25)' : 'rgba(30, 41, 59, 0.8)';
+                        this.ctx.strokeStyle = isSelected ? '#fbbf24' : '#475569';
+                        this.ctx.lineWidth = isSelected ? 2 : 1;
+                        this.ctx.fillRect(cardX, cardY, 190, 62);
+                        this.ctx.strokeRect(cardX, cardY, 190, 62);
+
+                        this.ctx.fillStyle = typeInfo.bg;
+                        this.ctx.fillRect(cardX + 8, cardY + 8, 32, 14);
+                        this.ctx.fillStyle = typeInfo.color;
+                        this.ctx.font = 'bold 9px "Noto Sans KR"';
+                        this.ctx.textAlign = 'center';
+                        this.ctx.fillText(typeInfo.name, cardX + 24, cardY + 18);
+
+                        this.ctx.fillStyle = isSelected ? '#fbbf24' : '#ffffff';
+                        this.ctx.font = 'bold 11px "Noto Sans KR"';
+                        this.ctx.textAlign = 'left';
+                        this.ctx.fillText(skill.name, cardX + 45, cardY + 19);
+
+                        this.ctx.fillStyle = skill.pp > 0 ? '#9ca3af' : '#ef4444';
+                        this.ctx.font = 'bold 10px "Noto Sans KR"';
+                        this.ctx.textAlign = 'right';
+                        this.ctx.fillText(`PP ${skill.pp}/${skill.maxPp}`, cardX + 182, cardY + 19);
+
+                        this.ctx.fillStyle = '#9ca3af';
+                        this.ctx.font = '10px "Noto Sans KR"';
+                        this.ctx.textAlign = 'left';
+                        this.ctx.fillText(skill.desc, cardX + 8, cardY + 45);
+                    });
+                }
+
+                const logX = 665;
+                const logY = h - 170;
+                const logW = w - logX - 15;
+
+                this.ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+                this.ctx.fillRect(logX, logY, logW, 155);
+                this.ctx.strokeRect(logX, logY, logW, 155);
+
+                this.ctx.fillStyle = '#f59e0b';
+                this.ctx.font = 'bold 12px "Noto Sans KR"';
+                this.ctx.fillText('전투 기록', logX + 12, logY + 22);
+
+                this.ctx.font = '10px "Noto Sans KR"';
+                this.battleLog.slice(-5).forEach((log, idx) => {
+                    this.ctx.fillStyle = idx === this.battleLog.length - 1 ? '#f3f4f6' : '#9ca3af';
+                    this.ctx.fillText(log, logX + 12, logY + 44 + idx * 20);
+                });
+            }
+
+            drawPokerogueShopOverlay() {
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+
+                this.ctx.fillStyle = 'rgba(5, 6, 12, 0.96)';
+                this.ctx.fillRect(0, 0, w, h);
+
+                // 상단 타이틀 (글씨 확대)
+                this.ctx.fillStyle = '#fbbf24';
+                this.ctx.font = 'black 22px "Noto Sans KR"';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText(`WAVE ${this.stage} 승리 - 신들의 성소 상점`, w / 2, 32);
+
+                this.ctx.fillStyle = '#38bdf8';
+                this.ctx.font = 'bold 15px "Noto Sans KR"';
+                this.ctx.fillText(`소지 골드: ${this.gold} Gold`, w / 2, 54);
+
+                // 1. [상단 - 고정 보급품 (확대된 크기)]
+                const itemW = 200;
+                const itemH = 135;
+
+                this.ctx.fillStyle = '#eab308';
+                this.ctx.font = 'bold 14px "Noto Sans KR"';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText('📌 [기본 상시 보급품]', (w - (3 * itemW + 24)) / 2, 78);
+
+                const startXFixed = (w - (this.fixedItems.length * itemW + (this.fixedItems.length - 1) * 12)) / 2;
+                const startYFixed = 86;
+
+                this.fixedItems.forEach((item, idx) => {
+                    const isSelected = idx === this.shopIndex;
+                    this.drawShopCard(item, startXFixed + idx * (itemW + 12), startYFixed, itemW, itemH, isSelected);
+                });
+
+                // 2. [중단 - 확률 보급품 (확대된 크기)]
+                const itemRandW = 195;
+                const itemRandH = 135;
+
+                this.ctx.fillStyle = '#c084fc';
+                this.ctx.font = 'bold 14px "Noto Sans KR"';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText('🎲 [무작위 신성 보급품]', (w - (4 * itemRandW + 36)) / 2, 240);
+
+                const startXRand = (w - (this.randomItems.length * itemRandW + (this.randomItems.length - 1) * 12)) / 2;
+                const startYRand = 248;
+
+                this.randomItems.forEach((item, idx) => {
+                    const realIdx = idx + this.fixedItems.length;
+                    const isSelected = realIdx === this.shopIndex;
+                    this.drawShopCard(item, startXRand + idx * (itemRandW + 12), startYRand, itemRandW, itemRandH, isSelected);
+                });
+
+                // 3. [하단 - 다음 스테이지 전진 버튼 (글자 크기 확대)]
+                const nextBtnW = 380;
+                const nextBtnH = 46;
+                const nextBtnX = (w - nextBtnW) / 2;
+                const nextBtnY = 402;
+                const isNextSelected = this.shopIndex === (this.fixedItems.length + this.randomItems.length);
+
+                this.ctx.fillStyle = isNextSelected ? 'rgba(34, 197, 94, 0.35)' : 'rgba(15, 23, 42, 0.85)';
+                this.ctx.strokeStyle = isNextSelected ? '#4ade80' : '#1e293b';
+                this.ctx.lineWidth = isNextSelected ? 3 : 1.5;
+                this.ctx.fillRect(nextBtnX, nextBtnY, nextBtnW, nextBtnH);
+                this.ctx.strokeRect(nextBtnX, nextBtnY, nextBtnW, nextBtnH);
+
+                this.ctx.fillStyle = isNextSelected ? '#4ade80' : '#d1d5db';
+                this.ctx.font = 'bold 16px "Noto Sans KR"';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText('⚔️ 다음 스테이지로 전진 (Space)', w / 2, nextBtnY + 29);
+
+                // 안내 가이드 글씨 확대
+                this.ctx.fillStyle = '#9ca3af';
+                this.ctx.font = 'bold 12px "Noto Sans KR"';
+                this.ctx.fillText('방향키(▲/▼/◀/▶)로 이동  |  [Space] 아이템 선택/구매', w / 2, h - 14);
+            }
+
+            drawShopCard(item, x, y, itemW, itemH, isSelected) {
+                // Card Base Fill
+                this.ctx.fillStyle = item.purchased ? 'rgba(30, 41, 59, 0.4)' : (isSelected ? 'rgba(245, 158, 11, 0.28)' : 'rgba(15, 23, 42, 0.88)');
+                this.ctx.strokeStyle = isSelected ? '#fbbf24' : '#334155';
+                this.ctx.lineWidth = isSelected ? 2.5 : 1;
+                this.ctx.fillRect(x, y, itemW, itemH);
+                this.ctx.strokeRect(x, y, itemW, itemH);
+
+                // Draw Specific Item Icon on the left
+                const iconX = x + 28;
+                const iconY = y + 36;
+                if (item.iconType) {
+                    this.drawItemIcon(item.iconType, iconX, iconY);
+                }
+
+                // Rarity Tag Text (확대)
+                this.ctx.fillStyle = item.rarityColor || '#c084fc';
+                this.ctx.font = 'bold 11px "Noto Sans KR"';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText(`[${item.rarity}]`, x + 50, y + 20);
+
+                // Item Name (확대)
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.font = 'bold 13px "Noto Sans KR"';
+                this.ctx.fillText(item.name, x + 50, y + 38);
+
+                // Price Tag (확대)
+                this.ctx.fillStyle = '#fbbf24';
+                this.ctx.font = 'black 13px "Noto Sans KR"';
+                this.ctx.fillText(`💰 ${item.price} G`, x + 50, y + 56);
+
+                // Item Description (글씨 크기 확대 및 래핑)
+                this.ctx.fillStyle = '#cbd5e1';
+                this.ctx.font = '11px "Noto Sans KR"';
+                this.wrapText(item.desc, x + 10, y + 78, itemW - 20, 14);
+
+                // Purchased Overlay Badge
+                if (item.purchased) {
+                    this.ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+                    this.ctx.fillRect(x, y, itemW, itemH);
+                    this.ctx.fillStyle = '#ef4444';
+                    this.ctx.font = 'bold 15px "Noto Sans KR"';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText('✓ 구매 완료', x + itemW / 2, y + itemH / 2 + 5);
+                }
+            }
+
+            wrapText(text, x, y, maxWidth, lineHeight) {
+                const words = text.split(' ');
+                let line = '';
+                let currentY = y;
+
+                for (let n = 0; n < words.length; n++) {
+                    const testLine = line + words[n] + ' ';
+                    const metrics = this.ctx.measureText(testLine);
+                    const testWidth = metrics.width;
+                    if (testWidth > maxWidth && n > 0) {
+                        this.ctx.fillText(line, x, currentY);
+                        line = words[n] + ' ';
+                        currentY += lineHeight;
+                    } else {
+                        line = testLine;
+                    }
+                }
+                this.ctx.fillText(line, x, currentY);
+            }
+
+            loop() {
+                this.updateParticles();
+                this.render();
+                requestAnimationFrame(() => this.loop());
+            }
+        }
+
+        window.onload = () => {
+            window.game = new Game();
+        };
+    </script>
+</body>
+</html>
